@@ -8,8 +8,26 @@ services:
     ports:
      - 5432:5432
     command: --autovacuum=off --fsync=off --synchronous_commit=off --full_page_writes=off --work_mem=12MB --max-connections=10 --max_wal_senders=0
+    volumes:
+      - postgres-data:/data
 
   redis:
     image: redis:6-alpine
     ports:
       - 6379:6379
+  
+  django:
+    build: ./
+    environment:
+      - DATABASE_URL=postgres://postgres@postgres:5432/postgres
+    ports:
+     - "80:80"
+    volumes:
+      - ./init.sh:/docker-entrypoint.d/init.sh
+    env_file:
+     - ./src/app/.env.ci
+    depends_on:
+     - postgres
+
+volumes:
+  postgres-data:
