@@ -21,7 +21,7 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres@postgres:5432/postgres
     ports:
-     - "80:80"
+     - 80:80
     volumes:
       - ./init.sh:/docker-entrypoint.d/init.sh
     env_file:
