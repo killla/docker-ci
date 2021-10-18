@@ -23,7 +23,6 @@ RUN mkdir -p /src /docker-entrypoint.d /usr/src/ \
     && useradd --home-dir /usr/src/user --uid 1000 user \
     && chown -R user:root /src && chmod -R g+rwX /src \
     && chown -R user:root /docker-entrypoint.d && chmod -R g+rwX /docker-entrypoint.d \
-    && chown -R user:root /usr/src/user && chmod -R g+rwX /usr/src/user \
     && chown -R user:root /usr/src/user && chmod -R g+rwX /usr/src/user
 
 COPY docker-entrypoint.sh /
