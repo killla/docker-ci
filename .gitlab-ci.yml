@@ -1,0 +1,79 @@
+stages:
+  - build
+  - test
+
+variables:
+  BUILD_IMAGE_NAME: "$CI_REGISTRY_IMAGE/build"
+  TEST_IMAGE_NAME: "$CI_REGISTRY_IMAGE/test"
+  DOCKER_BUILDKIT: 1
+
+docker-build:
+  image: docker:latest
+  stage: build
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker pull $BUILD_IMAGE_NAME:latest || true
+    - docker pull $TEST_IMAGE_NAME:latest || true
+  script:
+    - tag=":$CI_COMMIT_SHORT_SHA"
+    # build base python image with pip dependencies
+    - docker build
+      --target builder
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from $BUILD_IMAGE_NAME:latest
+      -t "$BUILD_IMAGE_NAME${tag}"
+      -t "$BUILD_IMAGE_NAME:latest"
+      .
+    - docker push "$BUILD_IMAGE_NAME${tag}"
+    - docker push "$BUILD_IMAGE_NAME:latest"
+
+    # build image for tests with pip dev-dependencies
+    - docker build 
+      --target test 
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from $BUILD_IMAGE_NAME:latest 
+      --cache-from $TEST_IMAGE_NAME:latest 
+      -t "$TEST_IMAGE_NAME${tag}" 
+      -t "$TEST_IMAGE_NAME:latest" 
+      .
+    - docker push "$TEST_IMAGE_NAME${tag}"
+    - docker push "$TEST_IMAGE_NAME:latest"
+
+    # build release image
+    - docker build
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from $BUILD_IMAGE_NAME:latest 
+      --cache-from $CI_REGISTRY_IMAGE:latest 
+      -t "$CI_REGISTRY_IMAGE${tag}" 
+      -t "$CI_REGISTRY_IMAGE:latest" 
+      .
+    - docker push "$CI_REGISTRY_IMAGE${tag}"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      exists:
+        - Dockerfile
+
+lint:
+  image: $TEST_IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+  stage: test
+  script:
+    - flake8 src
+  
+test:
+  image: $TEST_IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+  stage: test
+  script:
+    - cd src
+    - pytest -x --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: src/report.xml
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
